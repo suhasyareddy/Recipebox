@@ -368,32 +368,30 @@ export default function HomeDashboard() {
               <button
                 type="button"
                 onClick={() => toggleDietMode("veg")}
-                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all ${
+                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
                   dietMode === "veg"
                     ? "bg-white text-emerald-800 shadow-sm border border-emerald-300 ring-2 ring-emerald-500/20"
                     : "text-on-surface-variant hover:text-on-surface"
                 }`}
               >
-                <span className="w-3 h-3 rounded-[3px] border-2 border-emerald-600 flex items-center justify-center p-[1px]">
+                <span className="w-3.5 h-3.5 rounded-[3px] border-2 border-emerald-600 flex items-center justify-center p-[1px] bg-white">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
                 </span>
-                <span className="material-symbols-outlined text-[14px] text-emerald-600 font-black">check</span>
                 <span>Pure Veg</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => toggleDietMode("non-veg")}
-                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all ${
+                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
                   dietMode === "non-veg"
                     ? "bg-white text-red-800 shadow-sm border border-red-300 ring-2 ring-red-500/20"
                     : "text-on-surface-variant hover:text-on-surface"
                 }`}
               >
-                <span className="w-3 h-3 rounded-[3px] border-2 border-red-600 flex items-center justify-center p-[1px]">
+                <span className="w-3.5 h-3.5 rounded-[3px] border-2 border-red-600 flex items-center justify-center p-[1px] bg-white">
                   <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
                 </span>
-                <span className="material-symbols-outlined text-[14px] text-red-600 font-black">check</span>
                 <span>Non-Veg Meals</span>
               </button>
             </div>

@@ -57,9 +57,9 @@ export function isDishNonVeg(
 }
 
 /**
- * Renders the authentic Food Preference Indicator:
- * - Pure Veg: Emerald Green Square with Dot + Green Bold Tick Checkmark + Label
- * - Non-Veg: Crimson Red Square with Dot + Red Bold Tick Checkmark + Label
+ * Renders the clean Food Preference Indicator without any tick/check icons:
+ * - Pure Veg: Emerald Green Square with Dot + Label
+ * - Non-Veg: Crimson Red Square with Dot + Label
  */
 export function DietaryBadge({
   isNonVeg,
@@ -91,28 +91,27 @@ export function DietaryBadge({
     lg: "px-3.5 py-1.5 text-sm",
   };
 
-  const iconSizes = {
-    sm: "text-[14px]",
-    md: "text-[16px]",
-    lg: "text-[18px]",
+  const boxSizes = {
+    sm: "w-3.5 h-3.5 rounded-[3px]",
+    md: "w-4 h-4 rounded-[4px]",
+    lg: "w-4.5 h-4.5 rounded-[4px]",
+  };
+
+  const dotSizes = {
+    sm: "w-1.5 h-1.5",
+    md: "w-2 h-2",
+    lg: "w-2.5 h-2.5",
   };
 
   if (nonVeg) {
     return (
       <span
         className={`inline-flex items-center gap-1.5 font-bold rounded-full bg-red-50/95 text-red-700 border border-red-300 shadow-xs backdrop-blur-md transition-all ${sizeClasses[size]} ${className}`}
-        title="Non-Vegetarian (Selected)"
+        title="Non-Vegetarian"
       >
-        {/* Standard Indian Non-Veg Square with Red Dot */}
-        <span className="w-3.5 h-3.5 rounded-[3px] border-2 border-red-600 flex items-center justify-center shrink-0 p-[1px] bg-white">
-          <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
-        </span>
-        {/* Red Tick Indicator */}
-        <span
-          className={`material-symbols-outlined font-black text-red-600 leading-none ${iconSizes[size]}`}
-          style={{ fontVariationSettings: "'wght' 700" }}
-        >
-          check
+        {/* Standard Indian Non-Veg Red Box with Red Dot (No Tick Marks) */}
+        <span className={`${boxSizes[size]} border-2 border-red-600 flex items-center justify-center shrink-0 p-[1px] bg-white`}>
+          <span className={`${dotSizes[size]} rounded-full bg-red-600`}></span>
         </span>
         {showLabel && (
           <span className="text-red-700 font-extrabold tracking-tight">
@@ -126,18 +125,11 @@ export function DietaryBadge({
   return (
     <span
       className={`inline-flex items-center gap-1.5 font-bold rounded-full bg-emerald-50/95 text-emerald-800 border border-emerald-300 shadow-xs backdrop-blur-md transition-all ${sizeClasses[size]} ${className}`}
-      title="Pure Vegetarian (Selected)"
+      title="Pure Vegetarian"
     >
-      {/* Standard Indian Veg Square with Green Dot */}
-      <span className="w-3.5 h-3.5 rounded-[3px] border-2 border-emerald-600 flex items-center justify-center shrink-0 p-[1px] bg-white">
-        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
-      </span>
-      {/* Green Tick Indicator */}
-      <span
-        className={`material-symbols-outlined font-black text-emerald-600 leading-none ${iconSizes[size]}`}
-        style={{ fontVariationSettings: "'wght' 700" }}
-      >
-        check
+      {/* Standard Indian Veg Green Box with Green Dot (No Tick Marks) */}
+      <span className={`${boxSizes[size]} border-2 border-emerald-600 flex items-center justify-center shrink-0 p-[1px] bg-white`}>
+        <span className={`${dotSizes[size]} rounded-full bg-emerald-600`}></span>
       </span>
       {showLabel && (
         <span className="text-emerald-800 font-extrabold tracking-tight">
@@ -156,8 +148,9 @@ interface DietaryPreferenceSelectorProps {
 
 /**
  * Interactive Dietary Preference Selection Component
- * Supports Vegetarian vs Non-Vegetarian with instant Green Tick and Red Tick indicator updates.
- * Only the currently selected option displays the selected tick indicator.
+ * Supports Vegetarian vs Non-Vegetarian.
+ * Clean design: Green Box for Vegetarian, Red Box for Non-Vegetarian.
+ * No tick marks, check icons or additional symbols.
  */
 export function DietaryPreferenceSelector({
   value,
@@ -178,14 +171,14 @@ export function DietaryPreferenceSelector({
         <button
           type="button"
           onClick={() => onChange("Vegetarian")}
-          className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between ${
+          className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
             !isCurrentNonVeg
               ? "bg-emerald-50/90 border-emerald-500 ring-2 ring-emerald-500/25 shadow-sm"
-              : "bg-surface-container-low border-outline-variant/40 hover:bg-surface-container text-on-surface-variant opacity-80"
+              : "bg-surface-container-low border-outline-variant/40 hover:bg-surface-container text-on-surface-variant opacity-75"
           }`}
         >
           <div className="flex items-center gap-2.5">
-            {/* Square Indicator */}
+            {/* Green Selection Box (No Tick Marks) */}
             <span className="w-4 h-4 rounded-[4px] border-2 border-emerald-600 flex items-center justify-center shrink-0 p-[1px] bg-white">
               <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
             </span>
@@ -199,14 +192,13 @@ export function DietaryPreferenceSelector({
             </div>
           </div>
 
-          {/* Green Tick / Check Indicator (Only when selected) */}
+          {/* Clean Selection Highlight (No Tick Mark) */}
           {!isCurrentNonVeg ? (
-            <div className="flex items-center gap-1 bg-emerald-600 text-white rounded-full px-2 py-0.5 text-[11px] font-bold shadow-xs">
-              <span className="material-symbols-outlined text-sm font-black">check</span>
-              <span>Selected</span>
-            </div>
+            <span className="text-[11px] font-extrabold text-emerald-800 bg-emerald-200/60 px-2.5 py-0.5 rounded-full border border-emerald-400/40">
+              Selected
+            </span>
           ) : (
-            <div className="w-5 h-5 rounded-full border border-outline-variant/50"></div>
+            <div className="w-4 h-4 rounded-full border border-outline-variant/40"></div>
           )}
         </button>
 
@@ -214,14 +206,14 @@ export function DietaryPreferenceSelector({
         <button
           type="button"
           onClick={() => onChange("Non-Vegetarian")}
-          className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between ${
+          className={`p-3.5 rounded-2xl border text-left transition-all flex items-center justify-between cursor-pointer ${
             isCurrentNonVeg
               ? "bg-red-50/90 border-red-500 ring-2 ring-red-500/25 shadow-sm"
-              : "bg-surface-container-low border-outline-variant/40 hover:bg-surface-container text-on-surface-variant opacity-80"
+              : "bg-surface-container-low border-outline-variant/40 hover:bg-surface-container text-on-surface-variant opacity-75"
           }`}
         >
           <div className="flex items-center gap-2.5">
-            {/* Square Indicator */}
+            {/* Red Selection Box (No Tick Marks) */}
             <span className="w-4 h-4 rounded-[4px] border-2 border-red-600 flex items-center justify-center shrink-0 p-[1px] bg-white">
               <span className="w-2 h-2 rounded-full bg-red-600"></span>
             </span>
@@ -235,14 +227,13 @@ export function DietaryPreferenceSelector({
             </div>
           </div>
 
-          {/* Red Tick / Check Indicator (Only when selected) */}
+          {/* Clean Selection Highlight (No Tick Mark) */}
           {isCurrentNonVeg ? (
-            <div className="flex items-center gap-1 bg-red-600 text-white rounded-full px-2 py-0.5 text-[11px] font-bold shadow-xs">
-              <span className="material-symbols-outlined text-sm font-black">check</span>
-              <span>Selected</span>
-            </div>
+            <span className="text-[11px] font-extrabold text-red-800 bg-red-200/60 px-2.5 py-0.5 rounded-full border border-red-400/40">
+              Selected
+            </span>
           ) : (
-            <div className="w-5 h-5 rounded-full border border-outline-variant/50"></div>
+            <div className="w-4 h-4 rounded-full border border-outline-variant/40"></div>
           )}
         </button>
       </div>

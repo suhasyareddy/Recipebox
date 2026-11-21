@@ -105,7 +105,18 @@ CREATE POLICY "Allow authenticated updates to recipe-images"
   USING (bucket_id = 'recipe-images')
   WITH CHECK (bucket_id = 'recipe-images');
 
--- 6. Reload schema cache
+DROP POLICY IF EXISTS "Allow anon uploads to recipe-images" ON storage.objects;
+CREATE POLICY "Allow anon uploads to recipe-images"
+  ON storage.objects FOR INSERT
+  TO anon
+  WITH CHECK (bucket_id = 'recipe-images');
+
+-- 6. Clean legacy local relative paths that 404 in production
+UPDATE public.profiles
+SET avatar_url = 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80'
+WHERE avatar_url LIKE '/uploads/%';
+
+-- 7. Reload schema cache
 NOTIFY pgrst, 'reload schema';
 
 SELECT 'RecipeBox database schema, food preferences, and storage configured successfully!' AS status;

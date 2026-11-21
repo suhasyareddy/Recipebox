@@ -175,31 +175,29 @@ export default function RecipesCatalogPage() {
             <button
               type="button"
               onClick={() => setSelectedDiet("Pure Veg")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 selectedDiet === "Pure Veg"
                   ? "bg-emerald-600 text-white shadow-xs"
                   : "text-emerald-700 hover:bg-emerald-50"
               }`}
             >
-              <span className="w-2.5 h-2.5 rounded-[2px] border border-current flex items-center justify-center p-[1px]">
-                <span className="w-1 h-1 rounded-full bg-current"></span>
+              <span className="w-3 h-3 rounded-[3px] border border-current flex items-center justify-center p-[1px]">
+                <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
               </span>
-              <span className="material-symbols-outlined text-[13px] font-bold">check</span>
               <span>Pure Veg</span>
             </button>
             <button
               type="button"
               onClick={() => setSelectedDiet("Non-Veg")}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                 selectedDiet === "Non-Veg"
                   ? "bg-red-600 text-white shadow-xs"
                   : "text-red-600 hover:bg-red-50"
               }`}
             >
-              <span className="w-2.5 h-2.5 rounded-[2px] border border-current flex items-center justify-center p-[1px]">
-                <span className="w-1 h-1 rounded-full bg-current"></span>
+              <span className="w-3 h-3 rounded-[3px] border border-current flex items-center justify-center p-[1px]">
+                <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
               </span>
-              <span className="material-symbols-outlined text-[13px] font-bold">check</span>
               <span>Non-Veg</span>
             </button>
           </div>

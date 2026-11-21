@@ -49,6 +49,7 @@ function saveLocalCustomRecipes(recipes: Recipe[]) {
 }
 
 // Upload avatar image (tries local API first, then Supabase Storage fallback)
+// Upload avatar image to Supabase Storage (direct browser upload with API server route fallback)
 export async function uploadAvatarImage(file: File, userId?: string): Promise<string> {
   const cleanUserId = userId ? userId.replace(/[^a-zA-Z0-9_-]/g, "_") : "user";
   const fileExt = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -73,37 +74,54 @@ export async function uploadAvatarImage(file: File, userId?: string): Promise<st
           .getPublicUrl(fileName);
 
         if (pubData?.publicUrl) {
-          return pubData.publicUrl;
+          // Append cache-busting timestamp so browser/Next.js never caches stale image
+          return `${pubData.publicUrl}?v=${Date.now()}`;
         }
       } else {
-        console.warn("Supabase storage upload returned notice, trying local fallback:", sbError.message);
+        console.warn("Direct Supabase storage upload notice, delegating to API:", sbError.message);
       }
     } catch (sbErr) {
-      console.warn("Supabase storage exception, trying local fallback:", sbErr);
+      console.warn("Direct Supabase storage exception:", sbErr);
     }
   }
 
-  // 2. Secondary fallback: Local server storage endpoint (works in local dev & persists to disk)
+  // 2. Secondary fallback: Server-side API endpoint (which also uploads to Supabase Storage)
   try {
     const formData = new FormData();
     formData.append("file", file);
     if (userId) formData.append("userId", userId);
 
+    const headers: Record<string, string> = {};
+    if (supabase) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData.session?.access_token) {
+        headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+      }
+    }
+
     const res = await fetch("/api/upload-avatar", {
       method: "POST",
+      headers,
       body: formData,
     });
 
     if (res.ok) {
       const data = await res.json();
       if (data?.url) return data.url;
+    } else {
+      const errData = await res.json().catch(() => null);
+      if (errData?.error) throw new Error(errData.error);
     }
-  } catch (apiErr) {
-    console.warn("Local avatar upload API route notice:", apiErr);
+  } catch (apiErr: any) {
+    console.warn("API route avatar upload notice:", apiErr);
+    if (apiErr?.message && !apiErr.message.includes("fetch")) {
+      throw apiErr;
+    }
   }
 
-  // Fallback: Safe hosted avatar URL
-  return "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80";
+  throw new Error(
+    "Could not upload image to Supabase Storage. Please ensure the 'recipe-images' bucket is created and public in your Supabase Dashboard."
+  );
 }
 
 // Upload recipe image to local API or Supabase Storage
