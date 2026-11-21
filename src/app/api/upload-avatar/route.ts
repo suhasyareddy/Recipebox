@@ -28,6 +28,24 @@ export async function POST(request: NextRequest) {
     await fs.promises.writeFile(filePath, buffer);
 
     const publicUrl = `/uploads/avatars/${fileName}`;
+
+    // Also update public/uploads/profiles.json so GET /api/profile immediately returns the new avatar
+    try {
+      const profilesFile = path.join(process.cwd(), "public", "uploads", "profiles.json");
+      let profiles: any = {};
+      if (fs.existsSync(profilesFile)) {
+        profiles = JSON.parse(await fs.promises.readFile(profilesFile, "utf-8"));
+      }
+      profiles[userId] = {
+        ...(profiles[userId] || {}),
+        avatar_url: publicUrl,
+        updated_at: new Date().toISOString(),
+      };
+      await fs.promises.writeFile(profilesFile, JSON.stringify(profiles, null, 2), "utf-8");
+    } catch (profErr) {
+      console.warn("Notice updating profiles.json:", profErr);
+    }
+
     return NextResponse.json({ url: publicUrl });
   } catch (err: any) {
     console.error("Avatar upload API error:", err);

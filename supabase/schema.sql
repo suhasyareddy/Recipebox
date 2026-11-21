@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   avatar_url TEXT,
   bio TEXT DEFAULT 'Passionate home cook exploring traditional and modern Indian flavours.',
   dietary_preference TEXT DEFAULT 'Vegetarian',
+  food_preference TEXT DEFAULT 'Vegetarian',
   created_at TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW() NOT NULL
 );
@@ -31,19 +32,26 @@ CREATE POLICY "Users can insert their own profile."
 
 CREATE POLICY "Users can update their own profile." 
   ON public.profiles FOR UPDATE 
-  USING (auth.uid() = id);
+  USING (auth.uid() = id)
+  WITH CHECK (auth.uid() = id);
 
 -- 3. Trigger to auto-create Profile on auth.users sign-up
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, full_name, avatar_url)
+  INSERT INTO public.profiles (id, email, full_name, avatar_url, dietary_preference, food_preference)
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'full_name', split_part(NEW.email, '@', 1)),
-    COALESCE(NEW.raw_user_meta_data->>'avatar_url', 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80')
-  );
+    COALESCE(NEW.raw_user_meta_data->>'avatar_url', 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80'),
+    COALESCE(NEW.raw_user_meta_data->>'dietary_preference', NEW.raw_user_meta_data->>'food_preference', 'Vegetarian'),
+    COALESCE(NEW.raw_user_meta_data->>'food_preference', NEW.raw_user_meta_data->>'dietary_preference', 'Vegetarian')
+  )
+  ON CONFLICT (id) DO UPDATE SET
+    full_name = EXCLUDED.full_name,
+    dietary_preference = EXCLUDED.dietary_preference,
+    food_preference = EXCLUDED.food_preference;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

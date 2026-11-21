@@ -52,6 +52,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isConfigured, setIsConfigured] = useState(false);
 
+  const sanitizeAvatar = (url?: string | null): string | null => {
+    if (!url || typeof url !== "string") return null;
+    if (url.startsWith("data:") || url.length > 2000) return null;
+    return url;
+  };
+
   // Fetch or create profile for authenticated Supabase user
   const fetchProfile = useCallback(async (supabaseUser: User) => {
     // 1. Check local storage cache for instant reactive state
@@ -63,17 +69,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch {}
     }
 
+    // 2. Fetch server-side profile store (persistent on disk)
+    let srvProfile: Partial<Profile> = {};
+    try {
+      const res = await fetch(`/api/profile?userId=${encodeURIComponent(supabaseUser.id)}`);
+      if (res.ok) {
+        srvProfile = await res.json();
+      }
+    } catch {}
+
     const meta = supabaseUser.user_metadata || {};
+    const validSrvAvatar = sanitizeAvatar(srvProfile.avatar_url);
+    const validCachedAvatar = sanitizeAvatar(cached.avatar_url);
+    const validMetaAvatar = sanitizeAvatar(meta.avatar_url);
+
+    // Prioritize Non-Vegetarian or explicit preference if set in any layer
+    const initialPref =
+      (cached.dietary_preference && cached.dietary_preference !== "Vegetarian" ? cached.dietary_preference : null) ||
+      (srvProfile.dietary_preference && srvProfile.dietary_preference !== "Vegetarian" ? srvProfile.dietary_preference : null) ||
+      (meta.dietary_preference && meta.dietary_preference !== "Vegetarian" ? meta.dietary_preference : null) ||
+      (meta.food_preference && meta.food_preference !== "Vegetarian" ? meta.food_preference : null) ||
+      cached.dietary_preference ||
+      srvProfile.dietary_preference ||
+      meta.dietary_preference ||
+      meta.food_preference ||
+      "Vegetarian";
+
     const fallbackProfile: Profile = {
       id: supabaseUser.id,
       email: supabaseUser.email || "",
-      full_name: cached.full_name || meta.full_name || supabaseUser.email?.split("@")[0] || "Home Chef",
+      full_name: srvProfile.full_name || cached.full_name || meta.full_name || supabaseUser.email?.split("@")[0] || "Home Chef",
       avatar_url:
-        cached.avatar_url ||
-        meta.avatar_url ||
+        validSrvAvatar ||
+        validCachedAvatar ||
+        validMetaAvatar ||
         "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80",
-      bio: cached.bio || meta.bio || "Passionate home chef creating wholesome family meals.",
-      dietary_preference: cached.dietary_preference || meta.dietary_preference || "Vegetarian",
+      bio: srvProfile.bio || cached.bio || meta.bio || "Passionate home chef creating wholesome family meals.",
+      dietary_preference: initialPref,
+      food_preference: initialPref,
       created_at: supabaseUser.created_at,
       updated_at: new Date().toISOString(),
     };
@@ -93,13 +126,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (!error && data) {
+        const validDbAvatar = sanitizeAvatar(data.avatar_url);
+        const resolvedDietary =
+          (data.dietary_preference && data.dietary_preference !== "Vegetarian" ? data.dietary_preference : null) ||
+          (data.food_preference && data.food_preference !== "Vegetarian" ? data.food_preference : null) ||
+          (cached.dietary_preference && cached.dietary_preference !== "Vegetarian" ? cached.dietary_preference : null) ||
+          (srvProfile.dietary_preference && srvProfile.dietary_preference !== "Vegetarian" ? srvProfile.dietary_preference : null) ||
+          (meta.dietary_preference && meta.dietary_preference !== "Vegetarian" ? meta.dietary_preference : null) ||
+          (meta.food_preference && meta.food_preference !== "Vegetarian" ? meta.food_preference : null) ||
+          data.dietary_preference ||
+          data.food_preference ||
+          cached.dietary_preference ||
+          srvProfile.dietary_preference ||
+          meta.dietary_preference ||
+          meta.food_preference ||
+          "Vegetarian";
+
         const merged: Profile = {
           ...fallbackProfile,
           ...data,
-          full_name: data.full_name || fallbackProfile.full_name,
-          bio: data.bio || fallbackProfile.bio,
-          dietary_preference: data.dietary_preference || fallbackProfile.dietary_preference,
-          avatar_url: data.avatar_url || fallbackProfile.avatar_url,
+          full_name: srvProfile.full_name || data.full_name || fallbackProfile.full_name,
+          bio: srvProfile.bio || data.bio || fallbackProfile.bio,
+          dietary_preference: resolvedDietary,
+          food_preference: resolvedDietary,
+          avatar_url: validDbAvatar || validSrvAvatar || validCachedAvatar || fallbackProfile.avatar_url,
           email: supabaseUser.email || data.email || fallbackProfile.email,
         };
         setProfile(merged);
@@ -107,22 +157,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem(`recipebox_user_profile_${supabaseUser.id}`, JSON.stringify(merged));
         }
       } else {
-        // If row does not exist yet, auto-create it in profiles table
-        try {
-          await supabase.from("profiles").upsert(
-            {
-              id: supabaseUser.id,
-              full_name: fallbackProfile.full_name,
-              bio: fallbackProfile.bio,
-              dietary_preference: fallbackProfile.dietary_preference,
-              avatar_url: fallbackProfile.avatar_url,
-              email: fallbackProfile.email,
-            },
-            { onConflict: "id" }
-          );
-        } catch (insertErr) {
-          console.warn("Profile table initial sync notice:", insertErr);
-        }
         setProfile(fallbackProfile);
       }
     } catch (err) {
@@ -283,6 +317,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         data: {
           full_name: fullName,
           dietary_preference: dietary,
+          food_preference: dietary,
         },
       },
     });
@@ -298,6 +333,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             id: data.user.id,
             full_name: fullName,
             dietary_preference: dietary,
+            food_preference: dietary,
             email: email,
             avatar_url:
               "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80",
@@ -398,6 +434,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       );
     }
 
+    // 3. Persist to server API store (ensures disk persistence)
+    try {
+      await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updatedProfile),
+      });
+    } catch (srvErr) {
+      console.warn("Server profile sync notice:", srvErr);
+    }
+
     if (!isConfigured || !user || user.id.startsWith("demo-")) {
       return { error: null };
     }
@@ -406,11 +453,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) return { error: "Supabase client not initialized." };
 
     // 3. Update Supabase Auth User Metadata (only pass safe HTTP URL to prevent cookie overflow / HTTP 431)
+    const pref = updatedProfile.dietary_preference || updatedProfile.food_preference || "Vegetarian";
     try {
       const cleanMeta: any = {
         full_name: updatedProfile.full_name,
         bio: updatedProfile.bio,
-        dietary_preference: updatedProfile.dietary_preference,
+        dietary_preference: pref,
+        food_preference: pref,
       };
 
       if (
@@ -438,7 +487,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         id: user.id,
         full_name: updatedProfile.full_name,
         bio: updatedProfile.bio,
-        dietary_preference: updatedProfile.dietary_preference,
+        dietary_preference: pref,
+        food_preference: pref,
         avatar_url: updatedProfile.avatar_url,
         email: user.email,
         updated_at: new Date().toISOString(),

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { useFavourites } from "@/context/FavouritesContext";
 import { useAuth } from "@/context/AuthContext";
 import { fetchAllRecipes } from "@/lib/recipes";
+import { DietaryBadge } from "@/components/DietaryBadge";
 import type { Recipe } from "@/lib/supabase/types";
 
 export default function FavouritesPage() {
@@ -98,9 +99,12 @@ export default function FavouritesPage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
 
-                  <span className="absolute top-3.5 left-3.5 bg-surface-container-lowest/90 backdrop-blur-md text-on-surface px-3 py-1 rounded-full text-[11px] font-bold shadow-sm">
-                    {r.category}
-                  </span>
+                  <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5">
+                    <DietaryBadge tags={r.dietary_tags} title={r.title} size="sm" />
+                    <span className="bg-surface-container-lowest/90 backdrop-blur-md text-on-surface px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-sm">
+                      {r.category}
+                    </span>
+                  </div>
 
                   <button
                     type="button"

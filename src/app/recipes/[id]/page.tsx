@@ -8,6 +8,7 @@ import { fetchRecipeById, deleteRecipe } from "@/lib/recipes";
 import { useAuth } from "@/context/AuthContext";
 import { useFavourites } from "@/context/FavouritesContext";
 import { useToast } from "@/context/ToastContext";
+import { DietaryBadge } from "@/components/DietaryBadge";
 import type { Recipe } from "@/lib/supabase/types";
 
 export default function RecipeDetailPage({
@@ -212,11 +213,8 @@ export default function RecipeDetailPage({
             <div className="absolute inset-0 bg-gradient-to-t from-on-surface/90 via-on-surface/30 to-transparent pointer-events-none" />
 
             {/* Floating Badges */}
-            <div className="absolute top-4 left-4 flex flex-wrap gap-2">
-              <span className="bg-secondary text-on-secondary px-3 py-1 rounded-full text-xs flex items-center gap-1 shadow-md font-bold">
-                <span className="material-symbols-outlined text-sm">eco</span>
-                {recipe.dietary_tags?.[0] || "Vegetarian"}
-              </span>
+            <div className="absolute top-4 left-4 flex flex-wrap gap-2 items-center">
+              <DietaryBadge tags={recipe.dietary_tags} title={recipe.title} size="md" />
               <span className="bg-surface-container-lowest/90 backdrop-blur-md text-on-surface px-3 py-1 rounded-full text-xs shadow-sm font-bold">
                 {recipe.category}
               </span>

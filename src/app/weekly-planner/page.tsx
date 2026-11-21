@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { WEEKLY_SCHEDULE_DATA } from "@/data/recipes";
 import { useAuth } from "@/context/AuthContext";
+import { getWeekScheduleRange } from "@/lib/dateUtils";
 
 export default function WeeklyPlannerPage() {
   const { profile } = useAuth();
@@ -11,6 +12,18 @@ export default function WeeklyPlannerPage() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [weekData, setWeekData] = useState(WEEKLY_SCHEDULE_DATA);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [offsetWeeks, setOffsetWeeks] = useState(0);
+
+  const { weekLabel, days } = getWeekScheduleRange(offsetWeeks);
+
+  const activeWeekData = weekData.map((item, idx) => {
+    const computed = days[idx];
+    return {
+      ...item,
+      date: computed ? computed.date : item.date,
+      isToday: computed ? computed.isToday : false,
+    };
+  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -92,8 +105,11 @@ export default function WeeklyPlannerPage() {
             <div className="flex items-center gap-space-sm bg-surface-container-low px-space-md py-space-xs rounded-full shadow-sm border border-outline-variant/30">
               <button
                 aria-label="Previous Week"
-                onClick={() => showToast("Loaded previous week timetable")}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+                onClick={() => {
+                  setOffsetWeeks((p) => p - 1);
+                  showToast("Loaded previous week timetable");
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors cursor-pointer"
                 type="button"
               >
                 <span className="material-symbols-outlined text-[20px]">
@@ -105,13 +121,16 @@ export default function WeeklyPlannerPage() {
                   event_note
                 </span>
                 <span className="font-title-md text-title-md text-on-surface">
-                  Week of Oct 21 – Oct 27, 2024
+                  {weekLabel}
                 </span>
               </div>
               <button
                 aria-label="Next Week"
-                onClick={() => showToast("Loaded next week timetable")}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors"
+                onClick={() => {
+                  setOffsetWeeks((p) => p + 1);
+                  showToast("Loaded next week timetable");
+                }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-on-surface-variant hover:bg-surface-container-highest transition-colors cursor-pointer"
                 type="button"
               >
                 <span className="material-symbols-outlined text-[20px]">
@@ -241,7 +260,7 @@ export default function WeeklyPlannerPage() {
         <section className="w-full max-w-[1320px] mx-auto px-gutter py-space-sm">
           <div className="overflow-x-auto pb-space-lg">
             <div className="grid grid-cols-7 gap-space-sm min-w-[1160px]">
-              {weekData.map((dayItem, dayIdx) => {
+              {activeWeekData.map((dayItem, dayIdx) => {
                 const isToday = dayItem.isToday;
                 return (
                   <div

@@ -5,6 +5,7 @@ export interface Profile {
   avatar_url: string | null;
   bio: string | null;
   dietary_preference?: string | null;
+  food_preference?: string | null;
   created_at?: string;
   updated_at?: string;
 }

@@ -1,9 +1,107 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { AiMealGenModal } from "@/components/AiMealGenModal";
 import { useAuth } from "@/context/AuthContext";
+import { DietaryBadge, isDishNonVeg } from "@/components/DietaryBadge";
+import { getTodayBannerDisplay } from "@/lib/dateUtils";
+
+const VEG_MEALS = [
+  {
+    id: "breakfast",
+    slot: "Breakfast • 8:30 AM",
+    calories: "320 kcal",
+    cookTime: "25 Mins Cook",
+    title: "Soft Idlis & Vegetable Sambar with Fresh Coconut Chutney",
+    desc: "Naturally fermented lentil batter steamed to pillowy perfection, served with slow-cooked drumstick & shallot sambar.",
+    image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80",
+    tags: ["Pure Veg", "South Indian", "High Protein"],
+    recipeId: "soft-idlis-sambar",
+    topBarColor: "from-primary to-primary-container",
+    slotBadgeBg: "bg-primary/10 text-primary",
+    isNonVeg: false,
+    swapped: false,
+  },
+  {
+    id: "lunch",
+    slot: "Lunch • 1:30 PM",
+    calories: "540 kcal",
+    cookTime: "40 Mins Cook",
+    title: "Phulka Rotis with Paneer Butter Masala, Tadka Dal & Raita",
+    desc: "Hand-rolled wheat phulkas brushed with golden desi ghee, cottage cheese in mild tomato gravy, and tempered toor dal.",
+    image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=800&q=80",
+    tags: ["Pure Veg", "North Indian", "Comfort Food"],
+    recipeId: "paneer-butter-masala",
+    topBarColor: "from-tertiary to-tertiary-container",
+    slotBadgeBg: "bg-tertiary-fixed/50 text-on-tertiary-fixed",
+    isNonVeg: false,
+    swapped: false,
+  },
+  {
+    id: "dinner",
+    slot: "Dinner • 8:00 PM",
+    calories: "380 kcal",
+    cookTime: "20 Mins Cook",
+    title: "Light Vegetable Khichdi with Roasted Papad, Pickle & Curd",
+    desc: "Wholesome yellow moong dal and rice infused with cumin, ginger, turmeric and garden vegetables. Easy on digestion for restful sleep.",
+    image: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80",
+    tags: ["Gut Friendly", "Homestyle", "Light & Easy"],
+    recipeId: "vegetable-khichdi",
+    topBarColor: "from-secondary to-secondary-fixed",
+    slotBadgeBg: "bg-secondary-container/50 text-secondary",
+    isNonVeg: false,
+    swapped: false,
+  },
+];
+
+const NON_VEG_MEALS = [
+  {
+    id: "breakfast",
+    slot: "Breakfast • 8:30 AM",
+    calories: "360 kcal",
+    cookTime: "15 Mins Cook",
+    title: "Spicy Street-Style Egg Bhurji with Butter Pav",
+    desc: "Farm eggs scrambled with caramelized onions, green chillies, tomatoes and fresh coriander, served with toasted butter pav.",
+    image: "https://images.unsplash.com/photo-1525351484163-7529414344d8?auto=format&fit=crop&w=800&q=80",
+    tags: ["Non-Veg", "High Protein", "Quick Breakfast"],
+    recipeId: "kolkata-egg-curry",
+    topBarColor: "from-amber-600 to-amber-700",
+    slotBadgeBg: "bg-amber-100 text-amber-900",
+    isNonVeg: true,
+    swapped: false,
+  },
+  {
+    id: "lunch",
+    slot: "Lunch • 1:30 PM",
+    calories: "620 kcal",
+    cookTime: "50 Mins Cook",
+    title: "Hyderabadi Chicken Dum Biryani with Onion Raita",
+    desc: "Long grain aged basmati rice layered with tender saffron-marinated bone-in chicken, brown onions, and aromatic potli garam masala.",
+    image: "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?auto=format&fit=crop&w=800&q=80",
+    tags: ["Non-Veg", "Hyderabadi", "Dum Pukht"],
+    recipeId: "hyderabadi-chicken-dum-biryani",
+    topBarColor: "from-red-600 to-red-700",
+    slotBadgeBg: "bg-red-100 text-red-900",
+    isNonVeg: true,
+    swapped: false,
+  },
+  {
+    id: "dinner",
+    slot: "Dinner • 8:00 PM",
+    calories: "410 kcal",
+    cookTime: "35 Mins Cook",
+    title: "Chettinad Pepper Chicken with Soft Whole Wheat Phulkas",
+    desc: "Tender chicken morsels roasted with freshly crushed black peppercorns, roasted coconut paste, curry leaves and fennel.",
+    image: "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?auto=format&fit=crop&w=800&q=80",
+    tags: ["Non-Veg", "Chettinad", "Spicy & Robust"],
+    recipeId: "chettinad-pepper-chicken",
+    topBarColor: "from-orange-600 to-red-600",
+    slotBadgeBg: "bg-red-50 text-red-800",
+    isNonVeg: true,
+    swapped: false,
+  },
+];
 
 export default function HomeDashboard() {
   const { profile } = useAuth();
@@ -12,50 +110,38 @@ export default function HomeDashboard() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [meals, setMeals] = useState([
-    {
-      id: "breakfast",
-      slot: "Breakfast • 8:30 AM",
-      calories: "320 kcal",
-      cookTime: "25 Mins Cook",
-      title: "Soft Idlis & Vegetable Sambar with Fresh Coconut Chutney",
-      desc: "Naturally fermented lentil batter steamed to pillowy perfection, served with slow-cooked drumstick & shallot sambar.",
-      image: "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?auto=format&fit=crop&w=800&q=80",
-      tags: ["Pure Veg", "South Indian", "High Protein"],
-      recipeId: "soft-idlis-sambar",
-      topBarColor: "from-primary to-primary-container",
-      slotBadgeBg: "bg-primary/10 text-primary",
-      swapped: false,
-    },
-    {
-      id: "lunch",
-      slot: "Lunch • 1:30 PM",
-      calories: "540 kcal",
-      cookTime: "40 Mins Cook",
-      title: "Phulka Rotis with Paneer Butter Masala, Tadka Dal & Raita",
-      desc: "Hand-rolled wheat phulkas brushed with golden desi ghee, cottage cheese in mild tomato gravy, and tempered toor dal.",
-      image: "https://images.unsplash.com/photo-1631452180519-c014fe946bc7?auto=format&fit=crop&w=800&q=80",
-      tags: ["Pure Veg", "North Indian", "Comfort Food"],
-      recipeId: "paneer-butter-masala",
-      topBarColor: "from-tertiary to-tertiary-container",
-      slotBadgeBg: "bg-tertiary-fixed/50 text-on-tertiary-fixed",
-      swapped: false,
-    },
-    {
-      id: "dinner",
-      slot: "Dinner • 8:00 PM",
-      calories: "380 kcal",
-      cookTime: "20 Mins Cook",
-      title: "Light Vegetable Khichdi with Roasted Papad, Pickle & Curd",
-      desc: "Wholesome yellow moong dal and rice infused with cumin, ginger, turmeric and garden vegetables. Easy on digestion for restful sleep.",
-      image: "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80",
-      tags: ["Gut Friendly", "Homestyle", "Light & Easy"],
-      recipeId: "vegetable-khichdi",
-      topBarColor: "from-secondary to-secondary-fixed",
-      slotBadgeBg: "bg-secondary-container/50 text-secondary",
-      swapped: false,
-    },
-  ]);
+  const isUserDietNonVeg =
+    profile?.dietary_preference?.toLowerCase().includes("non") ||
+    profile?.dietary_preference?.toLowerCase().includes("omnivore");
+
+  const [dietMode, setDietMode] = useState<"veg" | "non-veg">("veg");
+  const [meals, setMeals] = useState(VEG_MEALS);
+  const [todayDateStr, setTodayDateStr] = useState<string>("");
+
+  useEffect(() => {
+    setTodayDateStr(getTodayBannerDisplay());
+  }, []);
+
+  // Sync initial diet mode when profile loads
+  useEffect(() => {
+    if (isUserDietNonVeg) {
+      setDietMode("non-veg");
+      setMeals(NON_VEG_MEALS);
+    } else {
+      setDietMode("veg");
+      setMeals(VEG_MEALS);
+    }
+  }, [isUserDietNonVeg]);
+
+  const toggleDietMode = (mode: "veg" | "non-veg") => {
+    setDietMode(mode);
+    setMeals(mode === "non-veg" ? NON_VEG_MEALS : VEG_MEALS);
+    showToast(
+      mode === "non-veg"
+        ? "Switched to delicious Non-Veg meal recommendations!"
+        : "Switched to Pure Vegetarian meal recommendations!"
+    );
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -67,51 +153,57 @@ export default function HomeDashboard() {
       prev.map((meal) => {
         if (meal.id === id) {
           if (!meal.swapped) {
-            return {
-              ...meal,
-              title:
-                meal.id === "breakfast"
-                  ? "Crispy Medu Vada with Drumstick Sambar"
-                  : meal.id === "lunch"
-                  ? "Amritsari Rajma Masala & Steamed Jeera Rice"
-                  : "Palak Paneer with Soft Whole Wheat Phulkas",
-              desc:
-                meal.id === "breakfast"
-                  ? "Golden fried spiced urad dal fritters with fresh mint coconut chutney."
-                  : meal.id === "lunch"
-                  ? "Slow simmered kidney beans in rich spiced tomato bhuna gravy."
-                  : "Iron-rich spinach puree with melt-in-mouth cottage cheese cubes.",
-              recipeId:
-                meal.id === "breakfast"
-                  ? "crispy-medu-vada"
-                  : meal.id === "lunch"
-                  ? "amritsari-rajma-chawal"
-                  : "paneer-butter-masala",
-              swapped: true,
-            };
+            if (dietMode === "non-veg") {
+              return {
+                ...meal,
+                title:
+                  meal.id === "breakfast"
+                    ? "Masala Egg Omelette with Whole Wheat Toast"
+                    : meal.id === "lunch"
+                    ? "Andhra Kodi Kura (Spicy Chicken Curry) & Steamed Rice"
+                    : "Punjabi Butter Chicken (Murgh Makhani) with Garlic Naan",
+                desc:
+                  meal.id === "breakfast"
+                    ? "Fluffy double-egg omelette whisked with onions, green chillies, tomatoes and fresh herbs."
+                    : meal.id === "lunch"
+                    ? "Fiery Guntur chilli spiced chicken curry slow simmered with poppy seeds and coconut."
+                    : "Tender tandoori chicken simmered in rich makhani gravy with butter, cream and kasuri methi.",
+                recipeId:
+                  meal.id === "breakfast"
+                    ? "kolkata-egg-curry"
+                    : meal.id === "lunch"
+                    ? "andhra-chicken-curry"
+                    : "punjabi-butter-chicken",
+                swapped: true,
+              };
+            } else {
+              return {
+                ...meal,
+                title:
+                  meal.id === "breakfast"
+                    ? "Crispy Medu Vada with Drumstick Sambar"
+                    : meal.id === "lunch"
+                    ? "Amritsari Rajma Masala & Steamed Jeera Rice"
+                    : "Palak Paneer with Soft Whole Wheat Phulkas",
+                desc:
+                  meal.id === "breakfast"
+                    ? "Golden fried spiced urad dal fritters with fresh mint coconut chutney."
+                    : meal.id === "lunch"
+                    ? "Slow simmered kidney beans in rich spiced tomato bhuna gravy."
+                    : "Iron-rich spinach puree with melt-in-mouth cottage cheese cubes.",
+                recipeId:
+                  meal.id === "breakfast"
+                    ? "crispy-medu-vada"
+                    : meal.id === "lunch"
+                    ? "amritsari-rajma-chawal"
+                    : "paneer-butter-masala",
+                swapped: true,
+              };
+            }
           } else {
-            return {
-              ...meal,
-              title:
-                meal.id === "breakfast"
-                  ? "Soft Idlis & Vegetable Sambar with Fresh Coconut Chutney"
-                  : meal.id === "lunch"
-                  ? "Phulka Rotis with Paneer Butter Masala, Tadka Dal & Raita"
-                  : "Light Vegetable Khichdi with Roasted Papad, Pickle & Curd",
-              desc:
-                meal.id === "breakfast"
-                  ? "Naturally fermented lentil batter steamed to pillowy perfection, served with slow-cooked drumstick & shallot sambar."
-                  : meal.id === "lunch"
-                  ? "Hand-rolled wheat phulkas brushed with golden desi ghee, cottage cheese in mild tomato gravy, and tempered toor dal."
-                  : "Wholesome yellow moong dal and rice infused with cumin, ginger, turmeric and garden vegetables. Easy on digestion for restful sleep.",
-              recipeId:
-                meal.id === "breakfast"
-                  ? "soft-idlis-sambar"
-                  : meal.id === "lunch"
-                  ? "paneer-butter-masala"
-                  : "vegetable-khichdi",
-              swapped: false,
-            };
+            const originalSet = dietMode === "non-veg" ? NON_VEG_MEALS : VEG_MEALS;
+            const original = originalSet.find((m) => m.id === id);
+            return original ? { ...original, swapped: false } : meal;
           }
         }
         return meal;
@@ -143,9 +235,9 @@ export default function HomeDashboard() {
             <div className="flex flex-col gap-space-xs max-w-2xl">
               <div className="inline-flex items-center gap-space-xs self-start bg-surface-container-high text-on-surface-variant px-space-md py-1 rounded-full font-label-sm text-label-sm shadow-sm">
                 <span className="w-2 h-2 rounded-full bg-secondary animate-pulse"></span>
-                <span>Thursday, 24 October • Kartika Masa</span>
+                <span>{todayDateStr || "Today • Fresh Daily Menu"}</span>
                 <span className="mx-1 text-outline/40">|</span>
-                <span className="text-primary font-medium">Ashwin Nakshatra</span>
+                <span className="text-primary font-medium">Satvik &amp; Wholesome</span>
               </div>
               <h1 className="font-headline-lg text-headline-lg sm:text-display-lg text-on-surface tracking-tight mt-space-xs">
                 Namaste, {firstName}!{" "}
@@ -213,11 +305,14 @@ export default function HomeDashboard() {
                 {firstName}&apos;s Kitchen Note • Tonight&apos;s Prep
               </span>
               <p className="font-title-md text-title-md text-on-surface mt-0.5">
-                Soak 1 cup Rajma (kidney beans) tonight in warm water for tomorrow's
-                hearty Punjabi lunch!
+                {dietMode === "non-veg"
+                  ? "Marinate 500g Chicken tonight in hung curd, ginger-garlic paste and fresh spices for tomorrow's aromatic Dum Biryani!"
+                  : "Soak 1 cup Rajma (kidney beans) tonight in warm water for tomorrow's hearty Punjabi lunch!"}
               </p>
               <span className="font-body-sm text-body-sm text-on-surface-variant">
-                Takes just 2 minutes • Ensures easy boiling in morning pressure cooker
+                {dietMode === "non-veg"
+                  ? "Takes just 5 minutes • Yields tender, deeply flavorful chicken with fragrant aroma"
+                  : "Takes just 2 minutes • Ensures easy boiling in morning pressure cooker"}
               </span>
             </div>
           </div>
@@ -227,7 +322,7 @@ export default function HomeDashboard() {
                 setPrepDone(!prepDone);
                 showToast(
                   !prepDone
-                    ? `Marked Rajma soaking as done for tonight! Great job, ${firstName}.`
+                    ? `Marked tonight's prep as done! Great job, ${firstName}.`
                     : "Reset prep reminder status."
                 );
               }}
@@ -255,7 +350,7 @@ export default function HomeDashboard() {
 
         {/* Main Today's Meals Spotlight Section */}
         <section className="flex flex-col gap-space-lg">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-space-xs">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-space-md">
             <div>
               <div className="flex items-center gap-space-xs">
                 <span className="w-2.5 h-2.5 rounded-full bg-primary"></span>
@@ -267,11 +362,40 @@ export default function HomeDashboard() {
                 Today's Meal Spotlight
               </h2>
             </div>
-            <div className="flex items-center gap-space-xs text-on-surface-variant font-label-sm text-label-sm">
-              <span className="material-symbols-outlined text-[18px] text-secondary">
-                eco
-              </span>
-              <span>100% Satvik &amp; Freshly Cooked</span>
+
+            {/* Diet View Filter Switcher */}
+            <div className="flex items-center gap-2 bg-surface-container-low p-1.5 rounded-2xl border border-outline-variant/30 shadow-xs">
+              <button
+                type="button"
+                onClick={() => toggleDietMode("veg")}
+                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all ${
+                  dietMode === "veg"
+                    ? "bg-white text-emerald-800 shadow-sm border border-emerald-300 ring-2 ring-emerald-500/20"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                <span className="w-3 h-3 rounded-[3px] border-2 border-emerald-600 flex items-center justify-center p-[1px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-600"></span>
+                </span>
+                <span className="material-symbols-outlined text-[14px] text-emerald-600 font-black">check</span>
+                <span>Pure Veg</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => toggleDietMode("non-veg")}
+                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all ${
+                  dietMode === "non-veg"
+                    ? "bg-white text-red-800 shadow-sm border border-red-300 ring-2 ring-red-500/20"
+                    : "text-on-surface-variant hover:text-on-surface"
+                }`}
+              >
+                <span className="w-3 h-3 rounded-[3px] border-2 border-red-600 flex items-center justify-center p-[1px]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-600"></span>
+                </span>
+                <span className="material-symbols-outlined text-[14px] text-red-600 font-black">check</span>
+                <span>Non-Veg Meals</span>
+              </button>
             </div>
           </div>
 
@@ -288,18 +412,26 @@ export default function HomeDashboard() {
                 <div className="flex flex-col gap-space-md">
                   {/* Meal Timing & Badge Header */}
                   <div className="flex items-center justify-between pt-1">
-                    <span
-                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-label-md text-label-md ${meal.slotBadgeBg}`}
-                    >
-                      <span className="material-symbols-outlined text-[16px]">
-                        {meal.id === "breakfast"
-                          ? "wb_twilight"
-                          : meal.id === "lunch"
-                          ? "sunny"
-                          : "nights_stay"}
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full font-label-md text-label-md ${meal.slotBadgeBg}`}
+                      >
+                        <span className="material-symbols-outlined text-[16px]">
+                          {meal.id === "breakfast"
+                            ? "wb_twilight"
+                            : meal.id === "lunch"
+                            ? "sunny"
+                            : "nights_stay"}
+                        </span>
+                        <span>{meal.slot}</span>
                       </span>
-                      <span>{meal.slot}</span>
-                    </span>
+                      <DietaryBadge
+                        isNonVeg={meal.isNonVeg}
+                        tags={meal.tags}
+                        title={meal.title}
+                        size="sm"
+                      />
+                    </div>
                     <span className="font-label-md text-label-md text-on-surface-variant flex items-center gap-1">
                       <span className="material-symbols-outlined text-[16px] text-tertiary">
                         local_fire_department

@@ -50,7 +50,40 @@ function saveLocalCustomRecipes(recipes: Recipe[]) {
 
 // Upload avatar image (tries local API first, then Supabase Storage fallback)
 export async function uploadAvatarImage(file: File, userId?: string): Promise<string> {
-  // 1. Try local server upload (zero RLS/storage bucket dependency, 100% reliable)
+  const cleanUserId = userId ? userId.replace(/[^a-zA-Z0-9_-]/g, "_") : "user";
+  const fileExt = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const safeExt = ["jpg", "jpeg", "png", "webp"].includes(fileExt) ? fileExt : "jpg";
+  const fileName = `avatars/${cleanUserId}_${Date.now()}.${safeExt}`;
+
+  // 1. Primary: Upload directly to Supabase Storage if configured
+  const supabase = getSupabaseClient();
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { error: sbError } = await supabase.storage
+        .from("recipe-images")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: true,
+          contentType: file.type || `image/${safeExt}`,
+        });
+
+      if (!sbError) {
+        const { data: pubData } = supabase.storage
+          .from("recipe-images")
+          .getPublicUrl(fileName);
+
+        if (pubData?.publicUrl) {
+          return pubData.publicUrl;
+        }
+      } else {
+        console.warn("Supabase storage upload returned notice, trying local fallback:", sbError.message);
+      }
+    } catch (sbErr) {
+      console.warn("Supabase storage exception, trying local fallback:", sbErr);
+    }
+  }
+
+  // 2. Secondary fallback: Local server storage endpoint (works in local dev & persists to disk)
   try {
     const formData = new FormData();
     formData.append("file", file);
@@ -67,28 +100,6 @@ export async function uploadAvatarImage(file: File, userId?: string): Promise<st
     }
   } catch (apiErr) {
     console.warn("Local avatar upload API route notice:", apiErr);
-  }
-
-  // 2. Try Supabase Storage bucket if configured
-  const supabase = getSupabaseClient();
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const fileExt = file.name.split(".").pop() || "jpg";
-      const fileName = `avatars/${userId || "user"}_${Date.now()}.${fileExt}`;
-
-      const { error } = await supabase.storage
-        .from("recipe-images")
-        .upload(fileName, file, { cacheControl: "3600", upsert: true });
-
-      if (!error) {
-        const { data } = supabase.storage
-          .from("recipe-images")
-          .getPublicUrl(fileName);
-        return data.publicUrl;
-      }
-    } catch (sbErr) {
-      console.warn("Supabase storage upload notice:", sbErr);
-    }
   }
 
   // Fallback: Safe hosted avatar URL
@@ -143,6 +154,7 @@ export async function uploadRecipeImage(file: File): Promise<string> {
 export interface RecipeFilters {
   query?: string;
   category?: string;
+  dietary?: "All" | "Non-Veg" | "Pure Veg";
   ingredient?: string;
   sort?: "newest" | "prep_time" | "cook_time" | "title";
 }
@@ -209,6 +221,42 @@ export async function fetchAllRecipes(filters?: RecipeFilters): Promise<Recipe[]
 
   if (filters?.category && filters.category !== "All") {
     results = results.filter((r) => r.category.toLowerCase() === filters.category?.toLowerCase());
+  }
+
+  if (filters?.dietary && filters.dietary !== "All") {
+    if (filters.dietary === "Non-Veg") {
+      results = results.filter((r) =>
+        r.dietary_tags?.some(
+          (t) =>
+            t.toLowerCase().includes("non-veg") ||
+            t.toLowerCase().includes("chicken") ||
+            t.toLowerCase().includes("fish") ||
+            t.toLowerCase().includes("egg") ||
+            t.toLowerCase().includes("mutton")
+        ) ||
+        r.title.toLowerCase().includes("chicken") ||
+        r.title.toLowerCase().includes("fish") ||
+        r.title.toLowerCase().includes("egg") ||
+        r.title.toLowerCase().includes("mutton") ||
+        r.title.toLowerCase().includes("biryani")
+      );
+    } else if (filters.dietary === "Pure Veg") {
+      results = results.filter(
+        (r) =>
+          !r.dietary_tags?.some(
+            (t) =>
+              t.toLowerCase().includes("non-veg") ||
+              t.toLowerCase().includes("chicken") ||
+              t.toLowerCase().includes("fish") ||
+              t.toLowerCase().includes("egg") ||
+              t.toLowerCase().includes("mutton")
+          ) &&
+          !r.title.toLowerCase().includes("chicken") &&
+          !r.title.toLowerCase().includes("fish") &&
+          !r.title.toLowerCase().includes("egg") &&
+          !r.title.toLowerCase().includes("mutton")
+      );
+    }
   }
 
   if (filters?.ingredient?.trim()) {

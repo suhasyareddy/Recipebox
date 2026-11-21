@@ -5,6 +5,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { fetchAllRecipes } from "@/lib/recipes";
 import { useFavourites } from "@/context/FavouritesContext";
+import { useAuth } from "@/context/AuthContext";
+import { DietaryBadge } from "@/components/DietaryBadge";
 import type { Recipe } from "@/lib/supabase/types";
 
 const CATEGORIES = [
@@ -19,6 +21,7 @@ const CATEGORIES = [
 
 export default function RecipesCatalogPage() {
   const { isFavourite, toggleFavourite } = useFavourites();
+  const { profile } = useAuth();
 
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,7 +30,20 @@ export default function RecipesCatalogPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [ingredientSearch, setIngredientSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+  const [selectedDiet, setSelectedDiet] = useState<"All" | "Non-Veg" | "Pure Veg">("All");
   const [sortBy, setSortBy] = useState<"newest" | "prep_time" | "cook_time" | "title">("newest");
+
+  // Auto-adapt to user profile diet preference on first load
+  useEffect(() => {
+    if (profile?.dietary_preference) {
+      const p = profile.dietary_preference.toLowerCase();
+      if (p.includes("non-veg") || p.includes("omnivore")) {
+        setSelectedDiet("All");
+      } else if (p.includes("veg")) {
+        setSelectedDiet("Pure Veg");
+      }
+    }
+  }, [profile?.dietary_preference]);
 
   useEffect(() => {
     async function load() {
@@ -35,6 +51,7 @@ export default function RecipesCatalogPage() {
       const data = await fetchAllRecipes({
         query: searchQuery,
         category: selectedCategory,
+        dietary: selectedDiet,
         ingredient: ingredientSearch,
         sort: sortBy,
       });
@@ -47,7 +64,7 @@ export default function RecipesCatalogPage() {
     }, 200);
 
     return () => clearTimeout(debounceTimer);
-  }, [searchQuery, selectedCategory, ingredientSearch, sortBy]);
+  }, [searchQuery, selectedCategory, selectedDiet, ingredientSearch, sortBy]);
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-14 space-y-8">
@@ -123,22 +140,69 @@ export default function RecipesCatalogPage() {
           </div>
         </div>
 
-        {/* Category Pills */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          {CATEGORIES.map((cat) => (
+        {/* Category & Dietary Filter Pills */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-outline-variant/20">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            {CATEGORIES.map((cat) => (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
+                  selectedCategory === cat
+                    ? "bg-primary text-on-primary shadow-sm"
+                    : "bg-surface-container hover:bg-surface-container-high text-on-surface-variant"
+                }`}
+              >
+                {cat}
+              </button>
+            ))}
+          </div>
+
+          {/* Dietary Selector Tabs with Red Tick for Non-Veg & Green Tick for Veg */}
+          <div className="flex items-center gap-1.5 p-1 bg-surface-container-low rounded-2xl border border-outline-variant/30 shrink-0 self-start sm:self-auto">
             <button
-              key={cat}
               type="button"
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                selectedCategory === cat
-                  ? "bg-primary text-on-primary shadow-sm"
-                  : "bg-surface-container hover:bg-surface-container-high text-on-surface-variant"
+              onClick={() => setSelectedDiet("All")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedDiet === "All"
+                  ? "bg-surface-container-lowest text-on-surface shadow-xs"
+                  : "text-on-surface-variant hover:text-on-surface"
               }`}
             >
-              {cat}
+              All Diets
             </button>
-          ))}
+            <button
+              type="button"
+              onClick={() => setSelectedDiet("Pure Veg")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedDiet === "Pure Veg"
+                  ? "bg-emerald-600 text-white shadow-xs"
+                  : "text-emerald-700 hover:bg-emerald-50"
+              }`}
+            >
+              <span className="w-2.5 h-2.5 rounded-[2px] border border-current flex items-center justify-center p-[1px]">
+                <span className="w-1 h-1 rounded-full bg-current"></span>
+              </span>
+              <span className="material-symbols-outlined text-[13px] font-bold">check</span>
+              <span>Pure Veg</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedDiet("Non-Veg")}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                selectedDiet === "Non-Veg"
+                  ? "bg-red-600 text-white shadow-xs"
+                  : "text-red-600 hover:bg-red-50"
+              }`}
+            >
+              <span className="w-2.5 h-2.5 rounded-[2px] border border-current flex items-center justify-center p-[1px]">
+                <span className="w-1 h-1 rounded-full bg-current"></span>
+              </span>
+              <span className="material-symbols-outlined text-[13px] font-bold">check</span>
+              <span>Non-Veg</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -189,10 +253,13 @@ export default function RecipesCatalogPage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none" />
 
-                  {/* Category Pill */}
-                  <span className="absolute top-3.5 left-3.5 bg-surface-container-lowest/90 backdrop-blur-md text-on-surface px-3 py-1 rounded-full text-[11px] font-bold shadow-sm">
-                    {r.category}
-                  </span>
+                  {/* Category & Dietary Badge */}
+                  <div className="absolute top-3.5 left-3.5 flex items-center gap-1.5 z-10 flex-wrap">
+                    <span className="bg-surface-container-lowest/90 backdrop-blur-md text-on-surface px-2.5 py-0.5 rounded-full text-[11px] font-bold shadow-sm">
+                      {r.category}
+                    </span>
+                    <DietaryBadge tags={r.dietary_tags} title={r.title} />
+                  </div>
 
                   {/* Favourite Button */}
                   <button

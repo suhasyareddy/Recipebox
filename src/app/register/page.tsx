@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
+import { DietaryPreferenceSelector } from "@/components/DietaryBadge";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -174,22 +175,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">
-              Household Diet
-            </label>
-            <select
-              value={dietary}
-              onChange={(e) => setDietary(e.target.value)}
-              className="w-full px-4 py-3 bg-surface-container-low rounded-xl border border-outline-variant/40 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary text-sm text-on-surface transition-all"
-            >
-              <option value="Vegetarian">Pure Vegetarian (Lacto-Vegetarian)</option>
-              <option value="Jain">Jain (No Root Vegetables / Satvik)</option>
-              <option value="Vegan">Vegan (Plant-Based)</option>
-              <option value="Eggetarian">Eggetarian</option>
-              <option value="Non-Vegetarian">Omnivore / Non-Vegetarian</option>
-            </select>
-          </div>
+          <DietaryPreferenceSelector value={dietary} onChange={setDietary} />
 
           <div>
             <label className="block text-xs font-semibold text-on-surface-variant mb-1 uppercase tracking-wider">

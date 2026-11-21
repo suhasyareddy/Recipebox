@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/context/ToastContext";
 import { useFavourites } from "@/context/FavouritesContext";
 import { fetchAllRecipes, deleteRecipe, uploadAvatarImage } from "@/lib/recipes";
+import { DietaryBadge, DietaryPreferenceSelector } from "@/components/DietaryBadge";
 import type { Recipe } from "@/lib/supabase/types";
 
 export default function ProfilePage() {
@@ -93,6 +94,9 @@ export default function ProfilePage() {
       if (error) {
         showToast("error", "Failed to update profile", error);
       } else {
+        setAvatarUrl(finalAvatar);
+        setAvatarPreview(finalAvatar);
+        setAvatarFile(null);
         showToast("success", "Profile Updated", "Your culinary profile details have been saved.");
         setIsEditing(false);
       }
@@ -143,10 +147,10 @@ export default function ProfilePage() {
                 <h1 className="font-editorial text-2xl sm:text-3xl font-bold text-on-surface">
                   {profile?.full_name || user?.user_metadata?.full_name || "Home Chef"}
                 </h1>
-                <span className="px-3 py-1 rounded-full bg-secondary/10 text-secondary text-xs font-bold flex items-center gap-1 border border-secondary/20">
-                  <span className="material-symbols-outlined text-sm">verified</span>
-                  {profile?.dietary_preference || user?.user_metadata?.dietary_preference || "Vegetarian"}
-                </span>
+                <DietaryBadge
+                  preference={profile?.dietary_preference || profile?.food_preference || "Vegetarian"}
+                  size="md"
+                />
               </div>
 
               <p className="text-xs text-on-surface-variant font-medium flex items-center gap-1.5">
@@ -273,9 +277,12 @@ export default function ProfilePage() {
                       className="object-cover"
                       unoptimized
                     />
-                    <span className="absolute top-3 left-3 bg-surface-container-lowest/90 px-2.5 py-1 rounded-full text-[10px] font-bold">
-                      {r.category}
-                    </span>
+                    <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                      <DietaryBadge tags={r.dietary_tags} title={r.title} size="sm" />
+                      <span className="bg-surface-container-lowest/90 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                        {r.category}
+                      </span>
+                    </div>
                   </div>
                   <div className="p-4 space-y-3">
                     <div>
@@ -337,9 +344,12 @@ export default function ProfilePage() {
                     className="object-cover"
                     unoptimized
                   />
-                  <span className="absolute top-3 left-3 bg-surface-container-lowest/90 px-2.5 py-1 rounded-full text-[10px] font-bold">
-                    {r.category}
-                  </span>
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                    <DietaryBadge tags={r.dietary_tags} title={r.title} size="sm" />
+                    <span className="bg-surface-container-lowest/90 px-2 py-0.5 rounded-full text-[10px] font-bold">
+                      {r.category}
+                    </span>
+                  </div>
                 </div>
                 <div className="p-4 space-y-3">
                   <div>
@@ -400,22 +410,7 @@ export default function ProfilePage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
-                  Dietary Preference
-                </label>
-                <select
-                  value={dietary}
-                  onChange={(e) => setDietary(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-surface-container-low rounded-xl border border-outline-variant/40 text-xs text-on-surface"
-                >
-                  <option value="Vegetarian">Pure Vegetarian</option>
-                  <option value="Jain">Jain / Satvik</option>
-                  <option value="Vegan">Vegan</option>
-                  <option value="Eggetarian">Eggetarian</option>
-                  <option value="Non-Vegetarian">Omnivore / Non-Vegetarian</option>
-                </select>
-              </div>
+              <DietaryPreferenceSelector value={dietary} onChange={setDietary} />
 
               <div>
                 <label className="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-1">
@@ -465,16 +460,28 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => setIsEditing(false)}
-                  className="px-4 py-2 rounded-xl border border-outline-variant/40 text-xs font-bold text-on-surface"
+                  disabled={isSavingProfile}
+                  className="px-4 py-2 rounded-xl border border-outline-variant/40 text-xs font-bold text-on-surface disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingProfile}
-                  className="px-5 py-2 rounded-xl bg-primary hover:bg-primary-container text-on-primary text-xs font-bold transition-all disabled:opacity-50"
+                  className="px-5 py-2 rounded-xl bg-primary hover:bg-primary-container text-on-primary text-xs font-bold transition-all disabled:opacity-50 flex items-center gap-2"
                 >
-                  {isSavingProfile ? "Saving..." : "Save Changes"}
+                  {isSavingProfile && (
+                    <span className="material-symbols-outlined text-sm animate-spin">
+                      progress_activity
+                    </span>
+                  )}
+                  <span>
+                    {isSavingProfile
+                      ? avatarFile
+                        ? "Uploading Photo & Saving..."
+                        : "Saving Profile..."
+                      : "Save Changes"}
+                  </span>
                 </button>
               </div>
             </form>
