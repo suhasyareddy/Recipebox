@@ -1,14 +1,17 @@
 {
-  "name": "temp-app",
+  "name": "recipebox",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node --max-http-header-size=10485760 scripts/dev.js dev",
     "build": "next build",
-    "start": "next start",
+    "start": "node --max-http-header-size=10485760 scripts/dev.js start",
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.7",
+    "@supabase/supabase-js": "^2.119.2",
+    "@tailwindcss/postcss": "^4.3.5",
     "next": "16.4.6",
     "react": "19.3.0",
     "react-dom": "19.3.0"
