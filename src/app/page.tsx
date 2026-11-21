@@ -104,8 +104,12 @@ const NON_VEG_MEALS = [
 ];
 
 export default function HomeDashboard() {
-  const { profile } = useAuth();
-  const firstName = profile?.full_name?.split(" ")[0] || "Chef";
+  const { profile, user } = useAuth();
+  const firstName =
+    profile?.full_name?.split(" ")[0] ||
+    user?.user_metadata?.full_name?.split(" ")[0] ||
+    user?.email?.split("@")[0] ||
+    "Chef";
   const [prepDone, setPrepDone] = useState(false);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);

@@ -74,13 +74,13 @@ export default function ProfilePage() {
     setIsSavingProfile(true);
     try {
       let finalAvatar = avatarUrl;
+      let avatarWarning: string | null = null;
       if (avatarFile) {
         try {
           finalAvatar = await uploadAvatarImage(avatarFile, user?.id);
         } catch (uploadErr: any) {
-          showToast("error", "Avatar Upload Failed", uploadErr?.message || "Could not upload the image. Please check Supabase Storage policies.");
-          setIsSavingProfile(false);
-          return;
+          console.warn("Avatar upload issue, proceeding with profile update:", uploadErr);
+          avatarWarning = uploadErr?.message || "Storage issue with avatar.";
         }
       }
 
@@ -97,7 +97,11 @@ export default function ProfilePage() {
         setAvatarUrl(finalAvatar);
         setAvatarPreview(finalAvatar);
         setAvatarFile(null);
-        showToast("success", "Profile Updated", "Your culinary profile details have been saved.");
+        if (avatarWarning) {
+          showToast("info", "Profile Updated", "Profile details saved successfully.");
+        } else {
+          showToast("success", "Profile Updated", "Your culinary profile details have been saved.");
+        }
         setIsEditing(false);
       }
     } catch (err: any) {

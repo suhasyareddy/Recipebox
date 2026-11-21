@@ -45,7 +45,9 @@ export function Navbar() {
                 RecipeBox
               </span>
               <span className="text-[11px] text-on-surface-variant font-normal">
-                Your Meal Planner
+                {profile?.full_name && !profile.id.startsWith("demo-")
+                  ? `${profile.full_name.split(" ")[0]}'s Meal Planner`
+                  : "Amma's Meal Planner"}
               </span>
             </div>
           </Link>

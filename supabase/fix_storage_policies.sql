@@ -57,7 +57,10 @@ ON storage.objects FOR SELECT
 TO anon
 USING (bucket_id = 'recipe-images');
 
--- 4. Confirm profiles table grants
+-- 4. Ensure public.profiles table columns and grants are fully configured
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS dietary_preference TEXT DEFAULT 'Vegetarian';
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS food_preference TEXT DEFAULT 'Vegetarian';
+
 GRANT ALL ON TABLE public.profiles TO authenticated;
 GRANT ALL ON TABLE public.profiles TO anon;
 GRANT ALL ON TABLE public.recipes TO authenticated;

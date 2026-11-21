@@ -468,12 +468,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         full_name: updatedProfile.full_name,
         bio: updatedProfile.bio,
         dietary_preference: pref,
-        food_preference: pref,
       };
 
       if (
         updatedProfile.avatar_url &&
         !updatedProfile.avatar_url.startsWith("data:") &&
+        updatedProfile.avatar_url.length < 500 &&
         (updatedProfile.avatar_url.startsWith("http://") ||
           updatedProfile.avatar_url.startsWith("https://") ||
           updatedProfile.avatar_url.startsWith("/"))
@@ -491,13 +491,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     // 4. Update 'profiles' table in Supabase PostgreSQL
+    // Notice: column is 'dietary_preference' in DB. We omit 'food_preference' to avoid PostgREST error 42703
     try {
       const payload: any = {
         id: user.id,
         full_name: updatedProfile.full_name,
         bio: updatedProfile.bio,
         dietary_preference: pref,
-        food_preference: pref,
         avatar_url: updatedProfile.avatar_url,
         email: user.email,
         updated_at: new Date().toISOString(),
