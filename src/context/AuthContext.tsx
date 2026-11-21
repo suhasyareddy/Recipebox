@@ -140,25 +140,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           (data.dietary_preference && data.dietary_preference !== "Vegetarian" ? data.dietary_preference : null) ||
           (data.food_preference && data.food_preference !== "Vegetarian" ? data.food_preference : null) ||
           (cached.dietary_preference && cached.dietary_preference !== "Vegetarian" ? cached.dietary_preference : null) ||
-          (srvProfile.dietary_preference && srvProfile.dietary_preference !== "Vegetarian" ? srvProfile.dietary_preference : null) ||
           (meta.dietary_preference && meta.dietary_preference !== "Vegetarian" ? meta.dietary_preference : null) ||
-          (meta.food_preference && meta.food_preference !== "Vegetarian" ? meta.food_preference : null) ||
           data.dietary_preference ||
           data.food_preference ||
           cached.dietary_preference ||
-          srvProfile.dietary_preference ||
           meta.dietary_preference ||
-          meta.food_preference ||
           "Vegetarian";
+
+        // Primary authoritative full_name source is PostgreSQL profiles table in Supabase
+        const authoritativeName =
+          data.full_name?.trim() ||
+          meta.full_name?.trim() ||
+          supabaseUser.email?.split("@")[0] ||
+          "Home Chef";
 
         const merged: Profile = {
           ...fallbackProfile,
           ...data,
-          full_name: srvProfile.full_name || data.full_name || fallbackProfile.full_name,
-          bio: srvProfile.bio || data.bio || fallbackProfile.bio,
+          full_name: authoritativeName,
+          bio: data.bio || meta.bio || fallbackProfile.bio,
           dietary_preference: resolvedDietary,
           food_preference: resolvedDietary,
-          avatar_url: validDbAvatar || validSrvAvatar || validCachedAvatar || fallbackProfile.avatar_url,
+          avatar_url: validDbAvatar || validCachedAvatar || validMetaAvatar || fallbackProfile.avatar_url,
           email: supabaseUser.email || data.email || fallbackProfile.email,
         };
         setProfile(merged);
@@ -166,7 +169,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorage.setItem(`recipebox_user_profile_${supabaseUser.id}`, JSON.stringify(merged));
         }
       } else {
-        setProfile(fallbackProfile);
+        const fallbackName =
+          meta.full_name?.trim() ||
+          supabaseUser.email?.split("@")[0] ||
+          "Home Chef";
+        const newProfile: Profile = {
+          ...fallbackProfile,
+          full_name: fallbackName,
+        };
+        setProfile(newProfile);
+
+        // Auto-insert profile row in Supabase database so this authenticated user has a real record
+        try {
+          await supabase
+            .from("profiles")
+            .upsert(
+              {
+                id: supabaseUser.id,
+                email: supabaseUser.email || "",
+                full_name: fallbackName,
+                bio: newProfile.bio,
+                dietary_preference: initialPref,
+                avatar_url: newProfile.avatar_url,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: "id" }
+            );
+        } catch {}
       }
     } catch (err) {
       console.warn("Using fallback profile:", err);
@@ -245,33 +274,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session.user);
         fetchProfile(session.user);
       } else {
-        const storedActive =
-          typeof window !== "undefined"
-            ? localStorage.getItem("recipebox_active_profile")
-            : null;
-        const storedDemo =
-          typeof window !== "undefined"
-            ? localStorage.getItem("recipebox_demo_user")
-            : null;
-
-        if (storedActive) {
-          try {
-            const parsed = JSON.parse(storedActive);
-            setProfile(parsed);
-          } catch {
-            setProfile(DEMO_PROFILE);
-          }
-        } else if (storedDemo) {
-          try {
-            const parsed = JSON.parse(storedDemo);
-            setUser(parsed.user);
-            setProfile(parsed.profile);
-          } catch {
-            setProfile(DEMO_PROFILE);
-          }
-        } else {
-          setProfile(DEMO_PROFILE);
-        }
+        setUser(null);
+        setProfile(null);
       }
       setIsLoading(false);
     });
@@ -285,19 +289,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchProfile(session.user);
       } else {
         setUser(null);
-        const storedActive =
-          typeof window !== "undefined"
-            ? localStorage.getItem("recipebox_active_profile")
-            : null;
-        if (storedActive) {
-          try {
-            setProfile(JSON.parse(storedActive));
-          } catch {
-            setProfile(DEMO_PROFILE);
-          }
-        } else {
-          setProfile(DEMO_PROFILE);
-        }
+        setProfile(null);
       }
       setIsLoading(false);
     });
@@ -424,21 +416,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    if (!isConfigured) {
-      setUser(null);
-      setProfile(null);
-      localStorage.removeItem("recipebox_demo_user");
-      return;
-    }
-
     const supabase = getSupabaseClient();
     if (supabase) {
-      await supabase.auth.signOut();
+      try {
+        await supabase.auth.signOut();
+      } catch {}
     }
     setUser(null);
     setProfile(null);
     if (typeof window !== "undefined") {
-      localStorage.removeItem("recipebox_demo_user");
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (
+          k &&
+          (k.startsWith("recipebox_user_profile_") ||
+            k.startsWith("recipebox_active_profile") ||
+            k.startsWith("recipebox_demo_user") ||
+            k.startsWith("recipebox_guest_"))
+        ) {
+          keysToRemove.push(k);
+        }
+      }
+      keysToRemove.forEach((k) => localStorage.removeItem(k));
     }
   };
 

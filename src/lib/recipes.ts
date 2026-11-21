@@ -176,15 +176,56 @@ export async function uploadAvatarImage(file: File, userId?: string): Promise<st
   );
 }
 
-// Upload recipe image to local API or Supabase Storage
+// Upload recipe image to Supabase Storage (direct browser upload with API server route fallback)
 export async function uploadRecipeImage(file: File): Promise<string> {
-  // 1. Try local server upload first
+  const supabase = getSupabaseClient();
+  const fileExt = (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const safeExt = ["jpg", "jpeg", "png", "webp", "gif"].includes(fileExt) ? fileExt : "jpg";
+  const fileName = `recipes/recipe_${Date.now()}_${Math.random().toString(36).substring(2, 8)}.${safeExt}`;
+
+  // 1. Primary: Upload directly to Supabase Storage if configured
+  if (isSupabaseConfigured() && supabase) {
+    try {
+      const { error: sbError } = await supabase.storage
+        .from("recipe-images")
+        .upload(fileName, file, {
+          cacheControl: "3600",
+          upsert: true,
+          contentType: file.type || `image/${safeExt}`,
+        });
+
+      if (!sbError) {
+        const { data: pubData } = supabase.storage
+          .from("recipe-images")
+          .getPublicUrl(fileName);
+
+        if (pubData?.publicUrl) {
+          return `${pubData.publicUrl}?v=${Date.now()}`;
+        }
+      } else {
+        console.warn("Direct Supabase recipe image upload notice, trying API fallback:", sbError.message);
+      }
+    } catch (sbErr) {
+      console.warn("Direct Supabase storage recipe image exception:", sbErr);
+    }
+  }
+
+  // 2. Secondary fallback: Server API endpoint
   try {
     const formData = new FormData();
     formData.append("file", file);
 
+    const headers: Record<string, string> = {};
+    if (supabase) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (sessionData.session?.access_token) {
+        headers["Authorization"] = `Bearer ${sessionData.session.access_token}`;
+      }
+    }
+
     const res = await fetch("/api/upload-recipe-image", {
       method: "POST",
+      headers,
       body: formData,
     });
 
@@ -193,30 +234,14 @@ export async function uploadRecipeImage(file: File): Promise<string> {
       if (data?.url) return data.url;
     }
   } catch (apiErr) {
-    console.warn("Local recipe image upload API route notice:", apiErr);
+    console.warn("API route recipe image upload notice:", apiErr);
   }
 
-  // 2. Try Supabase Storage fallback
-  const supabase = getSupabaseClient();
-  if (isSupabaseConfigured() && supabase) {
-    try {
-      const fileExt = file.name.split(".").pop() || "jpg";
-      const fileName = `${Math.random().toString(36).substring(2, 12)}_${Date.now()}.${fileExt}`;
-
-      const { error } = await supabase.storage
-        .from("recipe-images")
-        .upload(fileName, file, { cacheControl: "3600", upsert: true });
-
-      if (!error) {
-        const { data } = supabase.storage
-          .from("recipe-images")
-          .getPublicUrl(fileName);
-        return data.publicUrl;
-      }
-    } catch (sbErr) {
-      console.warn("Supabase storage recipe image upload notice:", sbErr);
-    }
-  }
+  // 3. Fallback: Compress client-side thumbnail (<40KB)
+  try {
+    const thumbnail = await compressImageToThumbnail(file, 300, 0.8);
+    if (thumbnail && thumbnail.length > 50) return thumbnail;
+  } catch {}
 
   return "https://images.unsplash.com/photo-1546833999-b9f581a1996d?auto=format&fit=crop&w=800&q=80";
 }
@@ -404,9 +429,9 @@ export async function createRecipe(
   }
 
   const supabase = getSupabaseClient();
-  const isDemo = !recipeData.user_id || recipeData.user_id.startsWith("demo-") || recipeData.user_id.startsWith("user-");
+  const isUUID = recipeData.user_id && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(recipeData.user_id);
 
-  if (isSupabaseConfigured() && supabase && !isDemo) {
+  if (isSupabaseConfigured() && supabase && isUUID) {
     const fullPayload: any = {
       user_id: recipeData.user_id,
       title: recipeData.title,
@@ -426,11 +451,17 @@ export async function createRecipe(
     let { data, error } = await supabase
       .from("recipes")
       .insert(fullPayload)
-      .select()
+      .select(`
+        *,
+        profiles:user_id (
+          full_name,
+          avatar_url
+        )
+      `)
       .single();
 
     if (error && (error.message?.includes("column") || error.code === "PGRST204" || error.code === "42703")) {
-      console.warn("Retrying recipe insert with base columns (omitting optional columns):", error.message);
+      console.warn("Retrying recipe insert with base columns:", error.message);
       const basePayload: any = {
         user_id: recipeData.user_id,
         title: recipeData.title,
@@ -447,7 +478,13 @@ export async function createRecipe(
       const retryRes = await supabase
         .from("recipes")
         .insert(basePayload)
-        .select()
+        .select(`
+          *,
+          profiles:user_id (
+            full_name,
+            avatar_url
+          )
+        `)
         .single();
 
       data = retryRes.data;
@@ -459,7 +496,11 @@ export async function createRecipe(
       throw new Error(error.message);
     }
 
-    return data as Recipe;
+    return {
+      ...data,
+      author_name: (data as any).profiles?.full_name || recipeData.author_name || "Community Chef",
+      author_avatar: (data as any).profiles?.avatar_url || recipeData.author_avatar,
+    } as Recipe;
   }
 
   // Local demo fallback
@@ -476,7 +517,7 @@ export async function createRecipe(
   return newRecipe;
 }
 
-// Update an existing recipe
+// Update an existing recipe (strict update targeting existing record, no duplicate creation)
 export async function updateRecipe(
   id: string,
   updates: Partial<Recipe>,
@@ -489,27 +530,65 @@ export async function updateRecipe(
     finalUpdates.image_url = imageUrl;
   }
 
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
   const supabase = getSupabaseClient();
-  if (isSupabaseConfigured() && supabase) {
+
+  if (isSupabaseConfigured() && supabase && isUUID) {
+    // Whitelist only valid PostgreSQL columns in 'public.recipes'
+    const allowedPayload: any = {
+      updated_at: new Date().toISOString(),
+    };
+    if (finalUpdates.title !== undefined) allowedPayload.title = finalUpdates.title;
+    if (finalUpdates.description !== undefined) allowedPayload.description = finalUpdates.description;
+    if (finalUpdates.category !== undefined) allowedPayload.category = finalUpdates.category;
+    if (finalUpdates.prep_time !== undefined) allowedPayload.prep_time = finalUpdates.prep_time;
+    if (finalUpdates.cook_time !== undefined) allowedPayload.cook_time = finalUpdates.cook_time;
+    if (finalUpdates.servings !== undefined) allowedPayload.servings = finalUpdates.servings;
+    if (finalUpdates.calories !== undefined) allowedPayload.calories = finalUpdates.calories;
+    if (finalUpdates.spice_level !== undefined) allowedPayload.spice_level = finalUpdates.spice_level;
+    if (finalUpdates.dietary_tags !== undefined) allowedPayload.dietary_tags = finalUpdates.dietary_tags;
+    if (finalUpdates.ingredients !== undefined) allowedPayload.ingredients = finalUpdates.ingredients;
+    if (finalUpdates.instructions !== undefined) allowedPayload.instructions = finalUpdates.instructions;
+    if (finalUpdates.image_url !== undefined) allowedPayload.image_url = finalUpdates.image_url;
+
     let { data, error } = await supabase
       .from("recipes")
-      .update(finalUpdates)
+      .update(allowedPayload)
       .eq("id", id)
-      .select()
+      .select(`
+        *,
+        profiles:user_id (
+          full_name,
+          avatar_url
+        )
+      `)
       .single();
 
     if (error && (error.message?.includes("column") || error.code === "PGRST204" || error.code === "42703")) {
-      const sanitized: any = { ...finalUpdates };
-      delete sanitized.calories;
-      delete sanitized.spice_level;
-      delete sanitized.dietary_tags;
-      delete sanitized.updated_at;
+      const basePayload: any = {
+        title: allowedPayload.title,
+        description: allowedPayload.description,
+        category: allowedPayload.category,
+        prep_time: allowedPayload.prep_time,
+        cook_time: allowedPayload.cook_time,
+        servings: allowedPayload.servings,
+        ingredients: allowedPayload.ingredients,
+        instructions: allowedPayload.instructions,
+        image_url: allowedPayload.image_url,
+        updated_at: allowedPayload.updated_at,
+      };
 
       const retryRes = await supabase
         .from("recipes")
-        .update(sanitized)
+        .update(basePayload)
         .eq("id", id)
-        .select()
+        .select(`
+          *,
+          profiles:user_id (
+            full_name,
+            avatar_url
+          )
+        `)
         .single();
 
       data = retryRes.data;
@@ -517,19 +596,37 @@ export async function updateRecipe(
     }
 
     if (error) {
-      throw new Error(error.message);
+      if (error.code === "PGRST116") {
+        throw new Error("You can only edit recipes that you created.");
+      }
+      throw new Error(error.message || "Failed to update recipe in database.");
     }
 
-    return data as Recipe;
+    if (!data) {
+      throw new Error("Recipe not found or you do not have permission to edit it.");
+    }
+
+    return {
+      ...data,
+      author_name: (data as any).profiles?.full_name || updates.author_name || "Community Chef",
+      author_avatar: (data as any).profiles?.avatar_url || updates.author_avatar,
+    } as Recipe;
   }
 
-  // Local update fallback
+  // Local update fallback (for custom or seed recipes stored locally)
   const list = getLocalCustomRecipes();
   const idx = list.findIndex((r) => r.id === id);
   if (idx !== -1) {
     list[idx] = { ...list[idx], ...finalUpdates, updated_at: new Date().toISOString() };
     saveLocalCustomRecipes(list);
     return list[idx];
+  }
+
+  const seedIdx = SEED_RECIPES.findIndex((r) => r.id === id);
+  if (seedIdx !== -1) {
+    SEED_RECIPES[seedIdx] = { ...SEED_RECIPES[seedIdx], ...finalUpdates, updated_at: new Date().toISOString() };
+    saveLocalCustomRecipes([SEED_RECIPES[seedIdx], ...list]);
+    return SEED_RECIPES[seedIdx];
   }
 
   throw new Error("Recipe not found or cannot be modified.");

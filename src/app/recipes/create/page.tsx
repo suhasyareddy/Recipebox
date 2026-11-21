@@ -122,7 +122,7 @@ export default function CreateRecipePage() {
 
       const newRecipe = await createRecipe(
         {
-          user_id: user?.id || "demo-amma-lakshmi-id",
+          user_id: user?.id || profile?.id || "guest-chef",
           title: title.trim(),
           description: description.trim() || `${category} recipe for wholesome family dining.`,
           category,
@@ -135,8 +135,8 @@ export default function CreateRecipePage() {
           ingredients: filteredIngredients,
           instructions: filteredInstructions,
           image_url: finalImage,
-          author_name: profile?.full_name || "Amma Lakshmi",
-          author_avatar: profile?.avatar_url || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80",
+          author_name: profile?.full_name || user?.user_metadata?.full_name || user?.email?.split("@")[0] || "Home Chef",
+          author_avatar: profile?.avatar_url || user?.user_metadata?.avatar_url || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80",
         },
         imageFile || undefined
       );

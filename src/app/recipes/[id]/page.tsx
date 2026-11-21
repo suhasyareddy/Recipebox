@@ -135,7 +135,7 @@ export default function RecipeDetailPage({
   }
 
   const isOwner = Boolean(
-    user && (user.id === recipe.user_id || recipe.user_id === "demo-amma-lakshmi-id")
+    user && recipe && user.id === recipe.user_id
   );
 
   const favorited = isFavourite(recipe.id);
@@ -289,7 +289,7 @@ export default function RecipeDetailPage({
                       Family Recipe By
                     </p>
                     <p className="text-base font-bold text-on-surface">
-                      {recipe.author_name || "Amma Lakshmi"}
+                      {recipe.author_name || "Community Chef"}
                     </p>
                   </div>
                 </div>

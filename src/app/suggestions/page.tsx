@@ -6,8 +6,12 @@ import { SAMPLE_RECIPES } from "@/data/recipes";
 import { useAuth } from "@/context/AuthContext";
 
 export default function SuggestionsPage() {
-  const { profile } = useAuth();
-  const firstName = profile?.full_name?.split(" ")[0] || "Chef";
+  const { profile, user } = useAuth();
+  const firstName =
+    profile?.full_name?.split(" ")[0] ||
+    user?.user_metadata?.full_name?.split(" ")[0] ||
+    user?.email?.split("@")[0] ||
+    "Chef";
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCuisine, setSelectedCuisine] = useState("All");
   const [selectedMeal, setSelectedMeal] = useState("All");

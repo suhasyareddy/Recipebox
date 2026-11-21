@@ -7,8 +7,12 @@ import { useAuth } from "@/context/AuthContext";
 import { getWeekScheduleRange } from "@/lib/dateUtils";
 
 export default function WeeklyPlannerPage() {
-  const { profile } = useAuth();
-  const firstName = profile?.full_name?.split(" ")[0] || "Chef";
+  const { profile, user } = useAuth();
+  const firstName =
+    profile?.full_name?.split(" ")[0] ||
+    user?.user_metadata?.full_name?.split(" ")[0] ||
+    user?.email?.split("@")[0] ||
+    "Chef";
   const [activeFilter, setActiveFilter] = useState("all");
   const [weekData, setWeekData] = useState(WEEKLY_SCHEDULE_DATA);
   const [toastMessage, setToastMessage] = useState<string | null>(null);

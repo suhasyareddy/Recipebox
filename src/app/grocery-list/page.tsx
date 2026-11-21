@@ -6,8 +6,12 @@ import { INITIAL_GROCERY_ITEMS, GroceryItem } from "@/data/recipes";
 import { useAuth } from "@/context/AuthContext";
 
 export default function GroceryListPage() {
-  const { profile } = useAuth();
-  const firstName = profile?.full_name?.split(" ")[0] || "Chef";
+  const { profile, user } = useAuth();
+  const firstName =
+    profile?.full_name?.split(" ")[0] ||
+    user?.user_metadata?.full_name?.split(" ")[0] ||
+    user?.email?.split("@")[0] ||
+    "Chef";
   const [items, setItems] = useState<GroceryItem[]>(INITIAL_GROCERY_ITEMS);
   const [showPantryNote, setShowPantryNote] = useState(true);
   const [toastMessage, setToastMessage] = useState<string | null>(null);

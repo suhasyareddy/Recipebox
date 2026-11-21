@@ -52,6 +52,14 @@ export default function EditRecipePage({
         return;
       }
 
+      // Ownership security: only the recipe author can edit their recipe
+      if (user && recipe.user_id && user.id !== recipe.user_id && !recipe.user_id.startsWith("demo-")) {
+        setErrorMessage("You do not have permission to edit this recipe. You can only edit recipes you created.");
+        showToast("error", "Access Denied", "You can only edit recipes that you created.");
+        setIsLoadingRecipe(false);
+        return;
+      }
+
       setTitle(recipe.title);
       setDescription(recipe.description || "");
       setCategory(recipe.category);
@@ -177,6 +185,19 @@ export default function EditRecipePage({
           progress_activity
         </span>
         <p className="text-sm text-on-surface-variant font-medium">Loading recipe details...</p>
+      </main>
+    );
+  }
+
+  if (errorMessage && !title) {
+    return (
+      <main className="max-w-4xl mx-auto px-4 py-16 text-center space-y-4">
+        <span className="material-symbols-outlined text-4xl text-primary">gpp_maybe</span>
+        <p className="text-base text-on-surface font-semibold">{errorMessage}</p>
+        <Link href="/recipes" className="inline-flex items-center gap-1.5 text-xs text-primary font-bold hover:underline">
+          <span className="material-symbols-outlined text-base">arrow_back</span>
+          Back to Recipes
+        </Link>
       </main>
     );
   }
