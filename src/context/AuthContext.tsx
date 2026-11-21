@@ -245,22 +245,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(session.user);
         fetchProfile(session.user);
       } else {
+        const storedActive =
+          typeof window !== "undefined"
+            ? localStorage.getItem("recipebox_active_profile")
+            : null;
         const storedDemo =
           typeof window !== "undefined"
             ? localStorage.getItem("recipebox_demo_user")
             : null;
-        if (storedDemo) {
+
+        if (storedActive) {
+          try {
+            const parsed = JSON.parse(storedActive);
+            setProfile(parsed);
+          } catch {
+            setProfile(DEMO_PROFILE);
+          }
+        } else if (storedDemo) {
           try {
             const parsed = JSON.parse(storedDemo);
             setUser(parsed.user);
             setProfile(parsed.profile);
           } catch {
-            setUser(null);
-            setProfile(null);
+            setProfile(DEMO_PROFILE);
           }
         } else {
-          setUser(null);
-          setProfile(null);
+          setProfile(DEMO_PROFILE);
         }
       }
       setIsLoading(false);
@@ -275,7 +285,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchProfile(session.user);
       } else {
         setUser(null);
-        setProfile(null);
+        const storedActive =
+          typeof window !== "undefined"
+            ? localStorage.getItem("recipebox_active_profile")
+            : null;
+        if (storedActive) {
+          try {
+            setProfile(JSON.parse(storedActive));
+          } catch {
+            setProfile(DEMO_PROFILE);
+          }
+        } else {
+          setProfile(DEMO_PROFILE);
+        }
       }
       setIsLoading(false);
     });
@@ -421,14 +443,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {
-    const activeUserId = user?.id || profile?.id;
-    if (!activeUserId) return { error: "No profile loaded." };
+    // 1. Determine active user ID: check user?.id, profile?.id, or retrieve current session directly, or use local fallback
+    let activeUserId = user?.id || profile?.id;
+    let currentUser = user;
+
+    if (!activeUserId) {
+      const supabase = getSupabaseClient();
+      if (supabase) {
+        try {
+          const { data } = await supabase.auth.getSession();
+          if (data.session?.user) {
+            currentUser = data.session.user;
+            activeUserId = data.session.user.id;
+            setUser(data.session.user);
+          }
+        } catch {}
+      }
+    }
+
+    if (!activeUserId) {
+      // Local/Guest fallback user
+      const guestKey = "recipebox_guest_user_id";
+      let localId = typeof window !== "undefined" ? localStorage.getItem(guestKey) : null;
+      if (!localId) {
+        localId = "guest-" + Math.random().toString(36).substring(2, 9);
+        if (typeof window !== "undefined") {
+          localStorage.setItem(guestKey, localId);
+        }
+      }
+      activeUserId = localId;
+      if (!user) {
+        const guestUser = {
+          id: activeUserId,
+          email: updates.email || "guest@recipebox.internal",
+          user_metadata: { full_name: updates.full_name || "Home Chef" },
+        } as unknown as User;
+        setUser(guestUser);
+      }
+    }
+
+    const pref = updates.dietary_preference || updates.food_preference || profile?.dietary_preference || profile?.food_preference || "Vegetarian";
 
     const updatedProfile: Profile = {
-      ...(profile || ({} as Profile)),
-      ...updates,
       id: activeUserId,
-      email: user?.email || profile?.email || "",
+      email: currentUser?.email || profile?.email || updates.email || "chef@recipebox.internal",
+      full_name: updates.full_name || profile?.full_name || "Home Chef",
+      bio: updates.bio ?? profile?.bio ?? "Passionate home chef creating wholesome family meals.",
+      dietary_preference: pref,
+      food_preference: pref,
+      avatar_url: updates.avatar_url || profile?.avatar_url || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=200&q=80",
+      ...(profile || {}),
+      ...updates,
       updated_at: new Date().toISOString(),
     };
 
@@ -441,6 +506,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         `recipebox_user_profile_${activeUserId}`,
         JSON.stringify(updatedProfile)
       );
+      localStorage.setItem("recipebox_active_profile", JSON.stringify(updatedProfile));
     }
 
     // 3. Persist to server API store (ensures disk persistence)
@@ -454,7 +520,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.warn("Server profile sync notice:", srvErr);
     }
 
-    if (!isConfigured || !user || user.id.startsWith("demo-")) {
+    if (!isConfigured || !currentUser || currentUser.id.startsWith("demo-") || currentUser.id.startsWith("guest-")) {
       return { error: null };
     }
 
@@ -462,7 +528,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!supabase) return { error: "Supabase client not initialized." };
 
     // 3. Update Supabase Auth User Metadata (only pass safe HTTP URL to prevent cookie overflow / HTTP 431)
-    const pref = updatedProfile.dietary_preference || updatedProfile.food_preference || "Vegetarian";
     try {
       const cleanMeta: any = {
         full_name: updatedProfile.full_name,
@@ -494,12 +559,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Notice: column is 'dietary_preference' in DB. We omit 'food_preference' to avoid PostgREST error 42703
     try {
       const payload: any = {
-        id: user.id,
+        id: activeUserId,
         full_name: updatedProfile.full_name,
         bio: updatedProfile.bio,
         dietary_preference: pref,
         avatar_url: updatedProfile.avatar_url,
-        email: user.email,
+        email: currentUser?.email || updatedProfile.email,
         updated_at: new Date().toISOString(),
       };
 
@@ -507,7 +572,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const { error: updateError, count } = await supabase
         .from("profiles")
         .update(payload)
-        .eq("id", user.id);
+        .eq("id", activeUserId);
 
       if (updateError || count === 0) {
         // Try upsert if row was not present
